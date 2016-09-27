@@ -1,0 +1,30 @@
+<?php
+
+/**
+ * @file HP WallArt - Installation file.
+ * @todo need to put DB changes here
+ */
+
+function hpwallart_requirements($phase) {
+  $requirements = array();
+  if ($phase === 'runtime') {
+    if (variable_get('hpwallart_base_url', '') === '') {
+      $requirements['base_url'] = array(
+        'title' => 'HP WallArt',
+        'description' => 'Please set the Base URL in the admin <a href="/admin/misc/hpwallart">settings page</a>.',
+        'value' => '',
+        'severity' => REQUIREMENT_ERROR,
+      );
+    }
+  }
+  return $requirements;
+}
+
+function hpwallart_enable() {
+
+}
+
+function hpwallart_disable() {
+
+}
+

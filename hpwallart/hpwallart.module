@@ -1,0 +1,200 @@
+<?php
+  error_reporting(E_ALL);
+  ini_set('display_errors', 1);
+
+/**
+ * @file Main module file
+ *  *
+ * Creating the product class and node type programmatically
+ * http://drupal.stackexchange.com/questions/96923/how-to-create-a-product-class-programmatically-in-d7-ubercart-3
+ * content -> add new product -> create attributes, record nid and attribute ids
+ *
+ * edit product
+ * https://designer.hpwallart.com/wallquotes?web_link=true&auth_token=5wVhKmVmP9fxQNDX&project_id=8
+ * https://designer.hpwallart.com/wallquotes?web_link=true&auth_token=5wVhKmVmP9fxQNDX&sku=WA_WD
+ *
+ * @todo use hook order to change the project state on order submit?
+ *
+ */
+
+/**
+ * Implements hook_init()
+ */
+function hpwallart_init() {
+  module_load_include('inc', 'hpwallart', 'includes/hpwallart_functions');
+  // require_once 'includes/functions.php';
+  //drupal_add_library('uc_gift_cards', 'uc_gift_cards');
+}
+
+/**
+ * Implements hook_permission()
+ */
+function hpwallart_permission() {
+  return array(
+    'administer hp wallart' => array(
+      'title' => t('Administer HP WallArt'),
+      'description' => t('Administer the HP WallArt Module Settings')
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu()
+ */
+function hpwallart_menu() {
+  $items = array();
+  $items['admin/misc/hpwallart'] = array(
+    'title' => 'HP WallArt Suite',
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'hpwallart_settings_page',
+    'access arguments' => array('administer hp wallart'),
+    'weight' => 0,
+  );
+  $items['hpwallart/auth'] = array(
+    'page callback' => 'hpwallart_authorize',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'auth.php',
+  );
+  $items['hpwallart/services'] = array(
+    'page callback' => 'hpwallart_services',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'services.php',
+  );
+  $items['hpwallart/services/user_info'] = array(
+    'page callback' => 'hpwallart_services_user_info',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'services.php',
+  );
+  $items['hpwallart/services/projects'] = array(
+    'page callback' => 'hpwallart_services_projects',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'services.php',
+  );
+  $items['hpwallart/services/projects/%'] = array(
+    'page callback' => 'hpwallart_services_projects_id',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'services.php',
+    'page arguments' => array(3),
+  );
+  $items['hpwallart/services/projects/%/add_to_cart'] = array(
+    'page callback' => 'hpwallart_services_projects_add_to_cart',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'services.php',
+    'page arguments' => array(3),
+  );
+  $items['hpwallart/services/multiple_projects/add_to_cart'] = array(
+    'page callback' => 'hpwallart_services_multi_projects_add_to_cart',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'services.php',
+  );
+ $items['hpwallart'] = array(
+    'page callback' => 'hpwallart_launch_page',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Displays our settings page
+ */
+function hpwallart_settings_page() {
+  if (isset($_POST['op'])) {
+    // Handle form submission
+    $hpwallart_base_url = check_plain($_POST['base_url']);
+    variable_set('hpwallart_base_url', $hpwallart_base_url);
+    drupal_set_message('Settings saved.', 'status', FALSE);
+  }
+  $markup = '<h1>HP WallArt Suite Configuration Settings</h1>';
+  $admin_form = drupal_get_form('hpwallart_admin_settings');
+  $markup .= drupal_render($admin_form);
+
+  $content['raw_markup'] = array(
+    '#type' => 'markup',
+    '#markup' => $markup
+  );
+
+  return $content;
+}
+
+/**
+ * Page builder for the suite launcher
+ */
+function hpwallart_launch_page() {
+  $markup = '<h1>HP WallArt Suite Page</h1>';
+  if (user_is_logged_in()) {
+    global $user;
+    if ($user->hp_auth_token) {
+      $auth_token = $user->hp_auth_token;
+    } else {
+      // Create and save one
+      $auth_token = hpwallart_create_token($user->uid);
+    }
+
+    $designer_url = 'https://designer.hpwallart.com/' . HPWALLART_BASE_URL . '?web_link=true&auth_token='.$auth_token;
+    $markup .= '<div class="button-link"><a href="'.$designer_url.'&sku=WA_WD">Create Wall Decal Project</a></div>';
+    $markup .= '<p>&nbsp;</p>';
+    $markup .= '<div class="button-link"><a href="'.$designer_url.'&sku=WA_WC">Create Wall Covering Project</a></div>';
+
+    $table = hpwallart_projects_table($user->uid);
+    $markup .= theme_table($table);
+
+  } else {
+    // Tell them to log in
+    $markup .= 'Please log in, or create an account to use the WallArt Suite';
+  }
+
+  $content['raw_markup'] = array(
+    '#type' => 'markup',
+    '#markup' => $markup
+  );
+
+  return $content;
+}
+
+/**
+ * database schema
+https://www.navartic.es/hp-wallart-manual/en/
+hpwallart_projects
+
+Field                   Type          Null  Comments
+
+id                      int(11)       No		Auto numeric. Primary key
+name                    varchar(255)	No    (documentation had project_name but that does not seem to work)
+width                   varchar(255)	Yes
+height                  varchar(255)	Yes
+user_id                 int(11)       No		Foreign key, related to the user table
+scene (1...n)           varchar(255)	Yes		Each of the background images (escenas)
+element (1...n)         varchar(255)	Yes		Each of the vector objects to place on top of the background (elementos)
+price                   float(0.00) 	Yes		Base price for square meter
+content_context_token   varchar(255)	Yes		Unique identifier to pass to designer by GET
+path                    varchar(255)	Yes		Project folder (PATH????)
+format                  varchar(255)	Yes		Format of the project SKU (WP | WA | CV)
+state                   varchar(255)	Yes		State of the project in designer (EDITING | IN_CART | PURCHASED | DELETED) CHANGED FROM STATUS
+has_pixelation_warning  tinyint(1)    Yes   Boolean true or false
+
+hpwallart_orders
+
+Field                   Type          Null  Comments
+
+id                      int(11)       No		Auto numeric. Primary key
+date                 date(0000-00-00)	No		Date of ordering
+project_id              int(11)       No		Foreign key. Identifier for the project.
+user_id                 int(11)       No		Foreign key. Identifier for the user.
+price                   double(0.00)	No		Final price for the project.
+uc_oid                  int(11)       Yes   Foreign key. Ubercart order id
+
+users
+hp_auth_token varchar(16) Yes token used for auth
+ALTER TABLE  `users` ADD  `hp_auth_token` VARCHAR( 16 ) NULL DEFAULT NULL
+ */
+
+

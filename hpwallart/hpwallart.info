@@ -1,0 +1,6 @@
+name = HP WallArt Suite Web Integration
+description = "Integrates the HP WallArt Suite"
+package = Custom
+core = 7.x
+files[] = hpwallart.module
+version = "7.x-1.0"
