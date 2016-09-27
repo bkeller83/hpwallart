@@ -27,4 +27,4 @@ content_context_token   varchar(255)	Yes		Unique identifier to pass to designer 
 path                    varchar(255)	Yes		Described as Project Folder in documentation
 format                  varchar(255)	Yes		Format of the project SKU (WP | WA | CV)
 state                   varchar(255)	Yes		State of the project in designer (EDITING | IN_CART | PURCHASED | DELETED) CHANGED FROM STATUS
-has_pixelation_warning  tinyint(1)    Yes   Boolean true or false
+has_pixelation_warning  tinyint(1)    Yes   Boolean true or false 
